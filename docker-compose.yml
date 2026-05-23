@@ -1,0 +1,23 @@
+services:
+  reports-service:
+    build: .
+    container_name: reports-service
+    ports:
+      - "8087:8087"
+    environment:
+      - SERVER_PORT=8087
+      - EUREKA_SERVER_URL=https://eureka-cbfvenaydcctfag4.canadacentral-01.azurewebsites.net/eureka/
+      - AUTH_SERVICE_URL=http://auth-service
+      - CONGRESO_SERVICE_URL=http://congreso-service
+      - ACTIVITIES_SERVICE_URL=http://activities-service
+      - ASISTENCIAS_SERVICE_URL=http://ms-asistencias
+      - JWT_SECRET=VGhpc0lzQVN1cGVyU2VjdXJlSldUU2VjcmV0S2V5Rm9yRGV2TXVzdEJlQXRMZWFzdDMyQ2hhcnM=
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - microservices-net
+
+networks:
+  microservices-net:
+    external: true

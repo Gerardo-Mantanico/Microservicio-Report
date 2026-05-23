@@ -1,0 +1,61 @@
+name: Deploy Ms Reports to Azure VM
+
+on:
+    push:
+        branches:
+            - "main"
+            - "hotfix"
+    workflow_dispatch:
+
+jobs:
+    build-deploy:
+        runs-on: ubuntu-latest
+        env:
+            DEPLOY_PATH: /opt/ms-reports
+            APP_DIR: back_reports
+            IMAGE_NAME: ms-reports
+            CONTAINER_NAME: reports-service
+            HOST_PORT: "8087"
+            CONTAINER_PORT: "8087"
+            COMPOSE_PROJECT_NAME: reports
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Prepare remote folder
+              uses: appleboy/ssh-action@v1.0.0
+              with:
+                  host: ${{ secrets.AZURE_VM_HOST }}
+                  username: ${{ secrets.AZURE_VM_USER }}
+                  key: ${{ secrets.AZURE_VM_SSH_KEY }}
+                  port: "22"
+                  envs: DEPLOY_PATH,APP_DIR
+                  script: |
+                      set -e
+                      sudo mkdir -p "$DEPLOY_PATH/$APP_DIR"
+                      sudo chown -R $USER:$USER "$DEPLOY_PATH"
+
+            - name: Copy project to VM
+              uses: appleboy/scp-action@v0.1.7
+              with:
+                  host: ${{ secrets.AZURE_VM_HOST }}
+                  username: ${{ secrets.AZURE_VM_USER }}
+                  key: ${{ secrets.AZURE_VM_SSH_KEY }}
+                  port: "22"
+                  source: "*,!**/.git*"
+                  target: ${{ env.DEPLOY_PATH }}/${{ env.APP_DIR }}
+
+            - name: Build and run Docker Compose
+              uses: appleboy/ssh-action@v1.0.0
+              with:
+                  host: ${{ secrets.AZURE_VM_HOST }}
+                  username: ${{ secrets.AZURE_VM_USER }}
+                  key: ${{ secrets.AZURE_VM_SSH_KEY }}
+                  port: "22"
+                  envs: DEPLOY_PATH,APP_DIR,COMPOSE_PROJECT_NAME
+                  script: |
+                      set -e
+                      cd "$DEPLOY_PATH/$APP_DIR"
+                      touch .env
+                      sudo docker compose -p "$COMPOSE_PROJECT_NAME" down || true
+                      sudo docker compose -p "$COMPOSE_PROJECT_NAME" up -d --build

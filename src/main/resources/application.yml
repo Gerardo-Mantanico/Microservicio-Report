@@ -1,7 +1,10 @@
 server:
   port: ${SERVER_PORT:8087}
+  forward-headers-strategy: framework
 
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: reports-service
 
@@ -20,7 +23,7 @@ eureka:
     prefer-ip-address: true
   client:
     service-url:
-      defaultZone: ${EUREKA_SERVER_URL:http://eureka-service:8761/eureka/}
+      defaultZone: ${EUREKA_SERVER_URL:https://eureka-cbfvenaydcctfag4.canadacentral-01.azurewebsites.net/eureka/}
     register-with-eureka: true
     fetch-registry: true
 
