@@ -1,0 +1,48 @@
+# ===== Build artifacts =====
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Keep Maven wrapper JAR if you add wrapper in the future
+!.mvn/wrapper/maven-wrapper.jar
+
+# ===== Logs =====
+logs/
+*.log
+hs_err_pid*
+replay_pid*
+
+# ===== IDE / Editor =====
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+.history/
+
+# ===== OS files =====
+.DS_Store
+Thumbs.db
+
+# ===== Environment / secrets =====
+.env
+.env.*
+*.env
+
+# ===== Test / reports =====
+surefire-reports/
+failsafe-reports/
+coverage/
+
+# ===== Temporary files =====
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# ===== Docker overrides =====
+docker-compose.override.yml
