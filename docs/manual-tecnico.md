@@ -98,7 +98,7 @@ Retorna:
 Valores en application.yml (sobrescribibles por env vars):
 - SERVER_PORT (default 8087)
 - JWT_SECRET
-- EUREKA_SERVER_URL
+- EUREKA_SERVER_URL=https://eureka-service-a6b0enhtggeqgwd7.eastus2-01.azurewebsites.net/eureka/
 - CONGRESO_SERVICE_URL
 - AUTH_SERVICE_URL
 - ACTIVITIES_SERVICE_URL
@@ -173,7 +173,7 @@ Nota de compatibilidad JVM:
 - Validar URLs de servicios en variables de entorno.
 
 ### 11.3 Servicio no aparece en Eureka
-- Revisar EUREKA_SERVER_URL.
+- Revisar EUREKA_SERVER_URL y confirmar que apunte a https://eureka-service-a6b0enhtggeqgwd7.eastus2-01.azurewebsites.net/eureka/.
 - Verificar conectividad de red y DNS.
 
 ### 11.4 Error en tests por Byte Buddy

@@ -5,7 +5,7 @@ services:
       - "8087:8087"
     environment:
       - SERVER_PORT=8087
-      - EUREKA_SERVER_URL=https://eureka-cbfvenaydcctfag4.canadacentral-01.azurewebsites.net/eureka/
+      - EUREKA_SERVER_URL=https://eureka-service-a6b0enhtggeqgwd7.eastus2-01.azurewebsites.net/eureka/
       - AUTH_SERVICE_URL=http://auth-service
       - CONGRESO_SERVICE_URL=http://congreso-service
       - ACTIVITIES_SERVICE_URL=http://activities-service
