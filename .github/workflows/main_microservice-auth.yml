@@ -57,5 +57,6 @@ jobs:
                       set -e
                       cd "$DEPLOY_PATH/$APP_DIR"
                       touch .env
+                      sudo docker rm -f reports-service || true
                       sudo docker compose -p "$COMPOSE_PROJECT_NAME" down || true
                       sudo docker compose -p "$COMPOSE_PROJECT_NAME" up -d --build

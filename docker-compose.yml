@@ -1,7 +1,6 @@
 services:
   reports-service:
     build: .
-    container_name: reports-service
     ports:
       - "8087:8087"
     environment:

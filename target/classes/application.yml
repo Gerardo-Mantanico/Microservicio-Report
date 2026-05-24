@@ -23,7 +23,7 @@ eureka:
     prefer-ip-address: true
   client:
     service-url:
-      defaultZone: ${EUREKA_SERVER_URL:https://eureka-cbfvenaydcctfag4.canadacentral-01.azurewebsites.net/eureka/}
+      defaultZone: ${EUREKA_SERVER_URL:https://eureka-service-a6b0enhtggeqgwd7.eastus2-01.azurewebsites.net/eureka/}
     register-with-eureka: true
     fetch-registry: true
 
