@@ -1,11 +1,13 @@
 package com.example.reports.service;
 
 import com.example.reports.client.AsistenciasClient;
+import com.example.reports.client.AuthClient;
 import com.example.reports.client.CongresoClient;
 import com.example.reports.client.dto.AsistenciaDto;
 import com.example.reports.client.dto.ConferenceDto;
 import com.example.reports.client.dto.InstitutionDto;
 import com.example.reports.client.dto.RegistrationDto;
+import com.example.reports.client.dto.SystemConfigurationDto;
 import com.example.reports.dto.CongressByInstitutionDto;
 import com.example.reports.dto.EarningsByCongressDto;
 import com.example.reports.dto.EarningsReportDto;
@@ -24,6 +26,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyString;
 
 @ExtendWith(MockitoExtension.class)
 class ReportServiceTest {
@@ -34,11 +37,14 @@ class ReportServiceTest {
     @Mock
     private AsistenciasClient asistenciasClient;
 
+    @Mock
+    private AuthClient authClient;
+
     @InjectMocks
     private ReportService reportService;
 
     @Test
-    void getEarningsReportShouldSumOnlyNonNullAmounts() {
+    void getEarningsReportShouldSumOnlyNonNullAmountsAndApplyCommission() {
         when(congresoClient.getAllRegistrations()).thenReturn(List.of(
                 RegistrationDto.builder().id(1L).amountPaid(new BigDecimal("100.50")).build(),
                 RegistrationDto.builder().id(2L).amountPaid(null).build(),
@@ -48,11 +54,16 @@ class ReportServiceTest {
                 ConferenceDto.builder().id(10L).build(),
                 ConferenceDto.builder().id(11L).build()
         ));
+        // Fallback or explicit 10%
+        when(authClient.getConfiguration(anyString())).thenReturn(
+                SystemConfigurationDto.builder().configurationValue("10").build()
+        );
 
         EarningsReportDto result = reportService.getEarningsReport();
 
         assertNotNull(result);
-        assertEquals(new BigDecimal("150.00"), result.getTotalEarnings());
+        // Total sum = 150.00. Commission = 10% of 150.00 = 15.00
+        assertEquals(new BigDecimal("15.00"), result.getTotalEarnings());
         assertEquals(2, result.getTotalConferences());
         assertEquals(3, result.getTotalRegistrations());
     }
@@ -97,7 +108,8 @@ class ReportServiceTest {
 
         assertEquals("Congreso no encontrado", result.getConferenceName());
         assertEquals(1, result.getTotalParticipants());
-        assertEquals(new BigDecimal("25.00"), result.getTotalEarnings());
+        // 25.00 - 10% = 22.50
+        assertEquals(new BigDecimal("22.50"), result.getTotalEarnings());
     }
 
     @Test
@@ -130,7 +142,8 @@ class ReportServiceTest {
 
         assertEquals("Congreso no encontrado", result.getConferenceName());
         assertEquals(BigDecimal.ZERO, result.getConferencePrice());
-        assertEquals(new BigDecimal("25.00"), result.getTotalEarnings());
+        // Total 25.00 - 10% = 22.50
+        assertEquals(new BigDecimal("22.50"), result.getTotalEarnings());
         assertEquals(2, result.getTotalRegistrations());
     }
 }

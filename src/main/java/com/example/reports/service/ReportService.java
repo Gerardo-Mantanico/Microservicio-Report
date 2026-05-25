@@ -1,6 +1,7 @@
 package com.example.reports.service;
 
 import com.example.reports.client.AsistenciasClient;
+import com.example.reports.client.AuthClient;
 import com.example.reports.client.CongresoClient;
 import com.example.reports.client.dto.AsistenciaDto;
 import com.example.reports.client.dto.ConferenceDto;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -20,18 +22,34 @@ public class ReportService {
 
     private final CongresoClient congresoClient;
     private final AsistenciasClient asistenciasClient;
+    private final AuthClient authClient;
+
+    private BigDecimal getCommissionPercentage() {
+        try {
+            var config = authClient.getConfiguration("PORCENTAJE_COMISION");
+            if (config != null && config.getConfigurationValue() != null) {
+                return new BigDecimal(config.getConfigurationValue()).divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+        return new BigDecimal("0.10"); // fallback to 10%
+    }
 
     public EarningsReportDto getEarningsReport() {
         List<RegistrationDto> registrations = congresoClient.getAllRegistrations();
         List<ConferenceDto> conferences = congresoClient.getAllConferences();
 
-        BigDecimal total = registrations.stream()
+        BigDecimal totalAmountPaid = registrations.stream()
                 .map(RegistrationDto::getAmountPaid)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        BigDecimal commission = getCommissionPercentage();
+        BigDecimal systemEarnings = totalAmountPaid.multiply(commission).setScale(2, RoundingMode.HALF_UP);
+
         return EarningsReportDto.builder()
-                .totalEarnings(total)
+                .totalEarnings(systemEarnings)
                 .totalConferences(conferences.size())
                 .totalRegistrations(registrations.size())
                 .build();
@@ -75,10 +93,13 @@ public class ReportService {
                 .filter(r -> conferenceId.equals(r.getConferenceId()))
                 .collect(Collectors.toList());
 
-        BigDecimal totalEarnings = conferenceRegs.stream()
+        BigDecimal totalAmountPaid = conferenceRegs.stream()
                 .map(RegistrationDto::getAmountPaid)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal commission = getCommissionPercentage();
+        BigDecimal congressEarnings = totalAmountPaid.subtract(totalAmountPaid.multiply(commission)).setScale(2, RoundingMode.HALF_UP);
 
         List<ParticipantReportDto.ParticipantEntryDto> participants = conferenceRegs.stream()
                 .map(r -> ParticipantReportDto.ParticipantEntryDto.builder()
@@ -92,7 +113,7 @@ public class ReportService {
                 .conferenceId(conferenceId)
                 .conferenceName(conference != null ? conference.getName() : "Congreso no encontrado")
                 .totalParticipants(participants.size())
-                .totalEarnings(totalEarnings)
+                .totalEarnings(congressEarnings)
                 .participants(participants)
                 .build();
     }
@@ -137,16 +158,19 @@ public class ReportService {
                 .filter(r -> conferenceId.equals(r.getConferenceId()))
                 .collect(Collectors.toList());
 
-        BigDecimal totalEarnings = conferenceRegs.stream()
+        BigDecimal totalAmountPaid = conferenceRegs.stream()
                 .map(RegistrationDto::getAmountPaid)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal commission = getCommissionPercentage();
+        BigDecimal congressEarnings = totalAmountPaid.subtract(totalAmountPaid.multiply(commission)).setScale(2, RoundingMode.HALF_UP);
 
         return EarningsByCongressDto.builder()
                 .conferenceId(conferenceId)
                 .conferenceName(conference != null ? conference.getName() : "Congreso no encontrado")
                 .conferencePrice(conference != null ? conference.getPrice() : BigDecimal.ZERO)
-                .totalEarnings(totalEarnings)
+                .totalEarnings(congressEarnings)
                 .totalRegistrations(conferenceRegs.size())
                 .build();
     }
