@@ -26,6 +26,8 @@ public class ParticipantReportDto {
     @Builder
     public static class ParticipantEntryDto {
         private Long userId;
+        private String fullName;
+        private String email;
         private BigDecimal amountPaid;
         private LocalDateTime registeredAt;
     }

@@ -15,6 +15,7 @@ public class AsistenciaDto {
     private Long idAsistencia;
     private Long idActividad;
     private Long idUsuario;
+    private String userFullName;
     private Integer idTipoParticipacion;
     private String nombreTipoParticipacion;
     private Long registradoPor;

@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -15,6 +17,23 @@ public class EarningsByCongressDto {
     private Long conferenceId;
     private String conferenceName;
     private BigDecimal conferencePrice;
-    private BigDecimal totalEarnings;
+    
+    private BigDecimal totalGrossEarnings;
+    private BigDecimal totalCommission;
+    private BigDecimal totalNetEarnings;
+    
     private long totalRegistrations;
+    private List<RegistrationDetailDto> registrationDetails;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class RegistrationDetailDto {
+        private Long userId;
+        private BigDecimal amountPaid;
+        private BigDecimal commissionDeducted;
+        private BigDecimal netEarnings;
+        private LocalDateTime registeredAt;
+    }
 }

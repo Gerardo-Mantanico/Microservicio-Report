@@ -7,6 +7,7 @@ import com.example.reports.client.dto.AsistenciaDto;
 import com.example.reports.client.dto.ConferenceDto;
 import com.example.reports.client.dto.InstitutionDto;
 import com.example.reports.client.dto.RegistrationDto;
+import com.example.reports.client.dto.UserResponse;
 import com.example.reports.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,19 +40,47 @@ public class ReportService {
     public EarningsReportDto getEarningsReport() {
         List<RegistrationDto> registrations = congresoClient.getAllRegistrations();
         List<ConferenceDto> conferences = congresoClient.getAllConferences();
+        List<InstitutionDto> institutions = congresoClient.getAllInstitutions();
 
         BigDecimal totalAmountPaid = registrations.stream()
                 .map(RegistrationDto::getAmountPaid)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal commission = getCommissionPercentage();
-        BigDecimal systemEarnings = totalAmountPaid.multiply(commission).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal commissionRate = getCommissionPercentage();
+        BigDecimal systemEarnings = totalAmountPaid.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+
+        Map<Long, InstitutionDto> instMap = institutions.stream()
+                .collect(Collectors.toMap(InstitutionDto::getId, i -> i, (a, b) -> a));
+
+        List<EarningsReportDto.CongressEarningsSummaryDto> breakdown = conferences.stream()
+                .map(c -> {
+                    List<RegistrationDto> confRegs = registrations.stream()
+                            .filter(r -> c.getId().equals(r.getConferenceId()))
+                            .toList();
+                    BigDecimal gross = confRegs.stream()
+                            .map(RegistrationDto::getAmountPaid)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal net = gross.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+                    InstitutionDto inst = instMap.get(c.getInstitutionId());
+                    return EarningsReportDto.CongressEarningsSummaryDto.builder()
+                            .conferenceId(c.getId())
+                            .conferenceName(c.getName())
+                            .institutionName(inst != null ? inst.getName() : "Desconocida")
+                            .registrationCount(confRegs.size())
+                            .grossEarnings(gross)
+                            .netEarnings(net)
+                            .build();
+                })
+                .sorted(Comparator.comparing(EarningsReportDto.CongressEarningsSummaryDto::getNetEarnings).reversed())
+                .collect(Collectors.toList());
 
         return EarningsReportDto.builder()
                 .totalEarnings(systemEarnings)
                 .totalConferences(conferences.size())
                 .totalRegistrations(registrations.size())
+                .congressEarnings(breakdown)
                 .build();
     }
 
@@ -101,12 +130,19 @@ public class ReportService {
         BigDecimal commission = getCommissionPercentage();
         BigDecimal congressEarnings = totalAmountPaid.subtract(totalAmountPaid.multiply(commission)).setScale(2, RoundingMode.HALF_UP);
 
+        Map<Long, UserResponse> userCache = new HashMap<>();
+
         List<ParticipantReportDto.ParticipantEntryDto> participants = conferenceRegs.stream()
-                .map(r -> ParticipantReportDto.ParticipantEntryDto.builder()
-                        .userId(r.getUserId())
-                        .amountPaid(r.getAmountPaid())
-                        .registeredAt(r.getRegisteredAt())
-                        .build())
+                .map(r -> {
+                    UserResponse user = userCache.computeIfAbsent(r.getUserId(), authClient::getUserById);
+                    return ParticipantReportDto.ParticipantEntryDto.builder()
+                            .userId(r.getUserId())
+                            .fullName(user != null ? user.getFullName() : "Usuario #" + r.getUserId())
+                            .email(user != null ? user.getEmail() : "N/A")
+                            .amountPaid(r.getAmountPaid())
+                            .registeredAt(r.getRegisteredAt())
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         return ParticipantReportDto.builder()
@@ -120,6 +156,12 @@ public class ReportService {
 
     public AttendanceByActivityDto getAttendanceByActivity(Long activityId) {
         List<AsistenciaDto> attendances = asistenciasClient.getAttendanceByActivity(activityId);
+        Map<Long, UserResponse> userCache = new HashMap<>();
+
+        attendances.forEach(a -> {
+            UserResponse user = userCache.computeIfAbsent(a.getIdUsuario(), authClient::getUserById);
+            if (user != null) a.setUserFullName(user.getFullName());
+        });
 
         return AttendanceByActivityDto.builder()
                 .activityId(activityId)
@@ -130,6 +172,12 @@ public class ReportService {
 
     public WorkshopReservationReportDto getWorkshopReservations(Long activityId) {
         List<AsistenciaDto> attendances = asistenciasClient.getAttendanceByActivity(activityId);
+        Map<Long, UserResponse> userCache = new HashMap<>();
+
+        attendances.forEach(a -> {
+            UserResponse user = userCache.computeIfAbsent(a.getIdUsuario(), authClient::getUserById);
+            if (user != null) a.setUserFullName(user.getFullName());
+        });
 
         Map<String, Long> byType = attendances.stream()
                 .collect(Collectors.groupingBy(
@@ -142,6 +190,7 @@ public class ReportService {
                 .activityId(activityId)
                 .totalReservations(attendances.size())
                 .reservationsByParticipationType(byType)
+                .reservations(attendances)
                 .build();
     }
 
@@ -158,20 +207,39 @@ public class ReportService {
                 .filter(r -> conferenceId.equals(r.getConferenceId()))
                 .collect(Collectors.toList());
 
-        BigDecimal totalAmountPaid = conferenceRegs.stream()
+        BigDecimal totalGross = conferenceRegs.stream()
                 .map(RegistrationDto::getAmountPaid)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal commission = getCommissionPercentage();
-        BigDecimal congressEarnings = totalAmountPaid.subtract(totalAmountPaid.multiply(commission)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal commissionRate = getCommissionPercentage();
+        BigDecimal totalCommission = totalGross.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalNet = totalGross.subtract(totalCommission).setScale(2, RoundingMode.HALF_UP);
+
+        List<EarningsByCongressDto.RegistrationDetailDto> details = conferenceRegs.stream()
+                .map(r -> {
+                    BigDecimal amount = r.getAmountPaid() != null ? r.getAmountPaid() : BigDecimal.ZERO;
+                    BigDecimal com = amount.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal net = amount.subtract(com).setScale(2, RoundingMode.HALF_UP);
+                    return EarningsByCongressDto.RegistrationDetailDto.builder()
+                            .userId(r.getUserId())
+                            .amountPaid(amount)
+                            .commissionDeducted(com)
+                            .netEarnings(net)
+                            .registeredAt(r.getRegisteredAt())
+                            .build();
+                })
+                .collect(Collectors.toList());
 
         return EarningsByCongressDto.builder()
                 .conferenceId(conferenceId)
                 .conferenceName(conference != null ? conference.getName() : "Congreso no encontrado")
                 .conferencePrice(conference != null ? conference.getPrice() : BigDecimal.ZERO)
-                .totalEarnings(congressEarnings)
+                .totalGrossEarnings(totalGross)
+                .totalCommission(totalCommission)
+                .totalNetEarnings(totalNet)
                 .totalRegistrations(conferenceRegs.size())
+                .registrationDetails(details)
                 .build();
     }
 }

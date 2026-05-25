@@ -1,6 +1,7 @@
 package com.example.reports.client;
 
 import com.example.reports.client.dto.SystemConfigurationDto;
+import com.example.reports.client.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,16 @@ public class AuthClient {
             return restTemplate.getForObject(
                     authUrl + "/api/v1/configuration/" + key,
                     SystemConfigurationDto.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public UserResponse getUserById(Long userId) {
+        try {
+            return restTemplate.getForObject(
+                    authUrl + "/api/v1/users/" + userId,
+                    UserResponse.class);
         } catch (Exception e) {
             return null;
         }
