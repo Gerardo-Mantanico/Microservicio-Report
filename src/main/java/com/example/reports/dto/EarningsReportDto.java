@@ -13,10 +13,15 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class EarningsReportDto {
-    private BigDecimal totalEarnings;
+    private BigDecimal totalEarnings; // This is the total system commission
+    private BigDecimal totalGrossVolume; // Total amount paid across all congresses
+    private BigDecimal averageEarningsPerCongress;
+    
     private long totalConferences;
     private long totalRegistrations;
+    
     private List<CongressEarningsSummaryDto> congressEarnings;
+    private List<InstitutionEarningsSummaryDto> institutionEarnings;
 
     @Data
     @NoArgsConstructor
@@ -28,6 +33,19 @@ public class EarningsReportDto {
         private String institutionName;
         private long registrationCount;
         private BigDecimal grossEarnings;
-        private BigDecimal netEarnings;
+        private BigDecimal netEarnings; // System commission for this congress
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class InstitutionEarningsSummaryDto {
+        private Long institutionId;
+        private String institutionName;
+        private long totalCongresses;
+        private long totalRegistrations;
+        private BigDecimal totalGrossEarnings;
+        private BigDecimal totalSystemCommission;
     }
 }

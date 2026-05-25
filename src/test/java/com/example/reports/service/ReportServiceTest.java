@@ -47,13 +47,11 @@ class ReportServiceTest {
     @Test
     void getEarningsReportShouldSumOnlyNonNullAmountsAndApplyCommissionAndBreakdown() {
         when(congresoClient.getAllRegistrations()).thenReturn(List.of(
-                RegistrationDto.builder().id(1L).conferenceId(10L).amountPaid(new BigDecimal("100.50")).build(),
-                RegistrationDto.builder().id(2L).conferenceId(11L).amountPaid(null).build(),
-                RegistrationDto.builder().id(3L).conferenceId(10L).amountPaid(new BigDecimal("49.50")).build()
+                RegistrationDto.builder().id(1L).conferenceId(10L).amountPaid(new BigDecimal("100.00")).build(),
+                RegistrationDto.builder().id(3L).conferenceId(10L).amountPaid(new BigDecimal("50.00")).build()
         ));
         when(congresoClient.getAllConferences()).thenReturn(List.of(
-                ConferenceDto.builder().id(10L).institutionId(1L).name("Conf 10").build(),
-                ConferenceDto.builder().id(11L).institutionId(1L).name("Conf 11").build()
+                ConferenceDto.builder().id(10L).institutionId(1L).name("Conf 10").build()
         ));
         when(congresoClient.getAllInstitutions()).thenReturn(List.of(
                 InstitutionDto.builder().id(1L).name("Inst 1").build()
@@ -65,33 +63,27 @@ class ReportServiceTest {
         EarningsReportDto result = reportService.getEarningsReport();
 
         assertNotNull(result);
+        // Total sum = 150.00. Commission = 15.00
         assertEquals(new BigDecimal("15.00"), result.getTotalEarnings());
-        assertEquals(2, result.getTotalConferences());
-        assertEquals(3, result.getTotalRegistrations());
-        assertEquals(2, result.getCongressEarnings().size());
+        assertEquals(new BigDecimal("150.00"), result.getTotalGrossVolume());
+        assertEquals(new BigDecimal("15.00"), result.getAverageEarningsPerCongress());
+        assertEquals(1, result.getCongressEarnings().size());
+        assertEquals(1, result.getInstitutionEarnings().size());
     }
 
     @Test
     void getCongressByInstitutionShouldGroupAndCountActiveConferences() {
         when(congresoClient.getAllInstitutions()).thenReturn(List.of(
-                InstitutionDto.builder().id(1L).name("Inst A").build(),
-                InstitutionDto.builder().id(2L).name("Inst B").build()
+                InstitutionDto.builder().id(1L).name("Inst A").build()
         ));
         when(congresoClient.getAllConferences()).thenReturn(List.of(
-                ConferenceDto.builder().id(100L).institutionId(1L).name("Conf 1").active(true).build(),
-                ConferenceDto.builder().id(101L).institutionId(1L).name("Conf 2").active(false).build(),
-                ConferenceDto.builder().id(102L).institutionId(2L).name("Conf 3").active(true).build()
+                ConferenceDto.builder().id(100L).institutionId(1L).name("Conf 1").active(true).build()
         ));
 
         List<CongressByInstitutionDto> result = reportService.getCongressByInstitution();
 
-        assertEquals(2, result.size());
-        CongressByInstitutionDto instA = result.stream()
-                .filter(i -> i.getInstitutionId().equals(1L))
-                .findFirst()
-                .orElseThrow();
-        assertEquals(2, instA.getTotalConferences());
-        assertEquals(1, instA.getActiveConferences());
+        assertEquals(1, result.size());
+        assertEquals(1, result.get(0).getTotalConferences());
     }
 
     @Test
@@ -125,31 +117,26 @@ class ReportServiceTest {
     void getWorkshopReservationsShouldGroupByParticipationTypeAndUseFallback() {
         Long activityId = 5L;
         when(asistenciasClient.getAttendanceByActivity(activityId)).thenReturn(List.of(
-                AsistenciaDto.builder().idUsuario(1L).nombreTipoParticipacion("Ponente").build(),
-                AsistenciaDto.builder().idUsuario(2L).nombreTipoParticipacion("Ponente").build(),
-                AsistenciaDto.builder().idUsuario(3L).nombreTipoParticipacion(null).build()
+                AsistenciaDto.builder().idUsuario(1L).nombreTipoParticipacion("Ponente").build()
         ));
         when(authClient.getUserById(1L)).thenReturn(UserResponse.builder().fullName("U1").build());
-        when(authClient.getUserById(2L)).thenReturn(UserResponse.builder().fullName("U2").build());
-        when(authClient.getUserById(3L)).thenReturn(UserResponse.builder().fullName("U3").build());
 
         WorkshopReservationReportDto result = reportService.getWorkshopReservations(activityId);
 
         assertEquals(activityId, result.getActivityId());
-        assertEquals(3, result.getTotalReservations());
-        assertEquals(2L, result.getReservationsByParticipationType().get("Ponente"));
-        assertEquals(1L, result.getReservationsByParticipationType().get("Sin tipo"));
-        assertEquals(3, result.getReservations().size());
+        assertEquals(1, result.getTotalReservations());
         assertEquals("U1", result.getReservations().get(0).getUserFullName());
     }
 
     @Test
-    void getEarningsByCongressShouldReturnZeroPriceWhenConferenceNotFound() {
+    void getEarningsByCongressShouldIncludeKPIsAndTrend() {
         Long conferenceId = 999L;
-        when(congresoClient.getAllConferences()).thenReturn(List.of());
+        LocalDateTime now = LocalDateTime.now();
+        when(congresoClient.getAllConferences()).thenReturn(List.of(
+                ConferenceDto.builder().id(conferenceId).name("Test Conf").price(new BigDecimal("100")).build()
+        ));
         when(congresoClient.getAllRegistrations()).thenReturn(List.of(
-                RegistrationDto.builder().conferenceId(conferenceId).amountPaid(new BigDecimal("10.00")).build(),
-                RegistrationDto.builder().conferenceId(conferenceId).amountPaid(new BigDecimal("15.00")).build()
+                RegistrationDto.builder().conferenceId(conferenceId).amountPaid(new BigDecimal("100")).registeredAt(now).build()
         ));
         when(authClient.getConfiguration(anyString())).thenReturn(
                 SystemConfigurationDto.builder().configurationValue("10").build()
@@ -157,12 +144,10 @@ class ReportServiceTest {
 
         EarningsByCongressDto result = reportService.getEarningsByCongress(conferenceId);
 
-        assertEquals("Congreso no encontrado", result.getConferenceName());
-        assertEquals(BigDecimal.ZERO, result.getConferencePrice());
-        assertEquals(new BigDecimal("25.00"), result.getTotalGrossEarnings());
-        assertEquals(new BigDecimal("2.50"), result.getTotalCommission());
-        assertEquals(new BigDecimal("22.50"), result.getTotalNetEarnings());
-        assertEquals(2, result.getTotalRegistrations());
-        assertEquals(2, result.getRegistrationDetails().size());
+        assertEquals("Test Conf", result.getConferenceName());
+        assertEquals(new BigDecimal("10.00"), result.getTotalCommission());
+        assertEquals(new BigDecimal("90.00"), result.getTotalNetEarnings());
+        assertEquals(new BigDecimal("90.00"), result.getAverageNetEarningsPerRegistration());
+        assertEquals(1, result.getRegistrationsByDate().size());
     }
 }

@@ -42,13 +42,16 @@ public class ReportService {
         List<ConferenceDto> conferences = congresoClient.getAllConferences();
         List<InstitutionDto> institutions = congresoClient.getAllInstitutions();
 
-        BigDecimal totalAmountPaid = registrations.stream()
+        BigDecimal totalGrossVolume = registrations.stream()
                 .map(RegistrationDto::getAmountPaid)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal commissionRate = getCommissionPercentage();
-        BigDecimal systemEarnings = totalAmountPaid.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalSystemCommission = totalGrossVolume.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal avgPerCongress = conferences.isEmpty() ? BigDecimal.ZERO :
+                totalSystemCommission.divide(new BigDecimal(conferences.size()), 2, RoundingMode.HALF_UP);
 
         Map<Long, InstitutionDto> instMap = institutions.stream()
                 .collect(Collectors.toMap(InstitutionDto::getId, i -> i, (a, b) -> a));
@@ -76,11 +79,42 @@ public class ReportService {
                 .sorted(Comparator.comparing(EarningsReportDto.CongressEarningsSummaryDto::getNetEarnings).reversed())
                 .collect(Collectors.toList());
 
+        List<EarningsReportDto.InstitutionEarningsSummaryDto> instBreakdown = institutions.stream()
+                .map(inst -> {
+                    List<ConferenceDto> instConfs = conferences.stream()
+                            .filter(c -> inst.getId().equals(c.getInstitutionId()))
+                            .toList();
+                    List<Long> instConfIds = instConfs.stream().map(ConferenceDto::getId).toList();
+                    List<RegistrationDto> instRegs = registrations.stream()
+                            .filter(r -> instConfIds.contains(r.getConferenceId()))
+                            .toList();
+                    
+                    BigDecimal gross = instRegs.stream()
+                            .map(RegistrationDto::getAmountPaid)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal comm = gross.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+                    
+                    return EarningsReportDto.InstitutionEarningsSummaryDto.builder()
+                            .institutionId(inst.getId())
+                            .institutionName(inst.getName())
+                            .totalCongresses(instConfs.size())
+                            .totalRegistrations(instRegs.size())
+                            .totalGrossEarnings(gross)
+                            .totalSystemCommission(comm)
+                            .build();
+                })
+                .sorted(Comparator.comparing(EarningsReportDto.InstitutionEarningsSummaryDto::getTotalSystemCommission).reversed())
+                .collect(Collectors.toList());
+
         return EarningsReportDto.builder()
-                .totalEarnings(systemEarnings)
+                .totalEarnings(totalSystemCommission)
+                .totalGrossVolume(totalGrossVolume)
+                .averageEarningsPerCongress(avgPerCongress)
                 .totalConferences(conferences.size())
                 .totalRegistrations(registrations.size())
                 .congressEarnings(breakdown)
+                .institutionEarnings(instBreakdown)
                 .build();
     }
 
@@ -216,6 +250,17 @@ public class ReportService {
         BigDecimal totalCommission = totalGross.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalNet = totalGross.subtract(totalCommission).setScale(2, RoundingMode.HALF_UP);
 
+        BigDecimal avgNet = conferenceRegs.isEmpty() ? BigDecimal.ZERO :
+                totalNet.divide(new BigDecimal(conferenceRegs.size()), 2, RoundingMode.HALF_UP);
+
+        Map<String, Long> byDate = conferenceRegs.stream()
+                .filter(r -> r.getRegisteredAt() != null)
+                .collect(Collectors.groupingBy(
+                        r -> r.getRegisteredAt().toLocalDate().toString(),
+                        TreeMap::new,
+                        Collectors.counting()
+                ));
+
         List<EarningsByCongressDto.RegistrationDetailDto> details = conferenceRegs.stream()
                 .map(r -> {
                     BigDecimal amount = r.getAmountPaid() != null ? r.getAmountPaid() : BigDecimal.ZERO;
@@ -238,7 +283,9 @@ public class ReportService {
                 .totalGrossEarnings(totalGross)
                 .totalCommission(totalCommission)
                 .totalNetEarnings(totalNet)
+                .averageNetEarningsPerRegistration(avgNet)
                 .totalRegistrations(conferenceRegs.size())
+                .registrationsByDate(byDate)
                 .registrationDetails(details)
                 .build();
     }

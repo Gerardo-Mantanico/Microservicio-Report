@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -21,8 +22,10 @@ public class EarningsByCongressDto {
     private BigDecimal totalGrossEarnings;
     private BigDecimal totalCommission;
     private BigDecimal totalNetEarnings;
+    private BigDecimal averageNetEarningsPerRegistration;
     
     private long totalRegistrations;
+    private Map<String, Long> registrationsByDate;
     private List<RegistrationDetailDto> registrationDetails;
 
     @Data
