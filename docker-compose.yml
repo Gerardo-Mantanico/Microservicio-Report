@@ -10,7 +10,7 @@ services:
       - AUTH_SERVICE_URL=http://auth-service
       - CONGRESO_SERVICE_URL=http://congreso-service
       - ACTIVITIES_SERVICE_URL=http://activities-service
-      - ASISTENCIAS_SERVICE_URL=http://ms-asistencias
+      - ASISTENCIAS_SERVICE_URL=http://ms-asistencias-certificados
       - JWT_SECRET=VGhpc0lzQVN1cGVyU2VjdXJlSldUU2VjcmV0S2V5Rm9yRGV2TXVzdEJlQXRMZWFzdDMyQ2hhcnM=
     restart: always
     env_file:
